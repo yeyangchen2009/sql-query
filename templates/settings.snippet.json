@@ -1,13 +1,11 @@
 {
-  "_comment": "把下面 allow 数组里的几行复制到项目 .claude/settings.local.json 的 permissions.allow 里, Claude 跑这个脚本时就不再每次问 yes",
+  "_comment": "这是权限片段，不要直接覆盖项目 .claude/settings.local.json。allow 里放的是业务项目里的薄壳脚本命令，不是 sql-query skill 仓库里的 scripts/db_query.py。复制 templates/0-scripts/wrapper.py 到项目 0-scripts/wrapper.py 后，用 wrapper.py；如果复制成 doris_query.py，就把下面文件名改成 doris_query.py。",
   "permissions": {
     "allow": [
-      "Bash(python 0-scripts/db_query.py*)",
-      "Bash(python D:/<project-path>/0-scripts/db_query.py*)",
-      "Bash(PYTHONIOENCODING=utf-8 python 0-scripts/db_query.py*)",
-      "Bash(PYTHONIOENCODING=utf-8 python D:/<project-path>/0-scripts/db_query.py*)",
-      "Bash(cd D:/<project-path> && python 0-scripts/db_query.py*)",
-      "Bash(cd D:/<project-path> && PYTHONIOENCODING=utf-8 python 0-scripts/db_query.py*)"
+      "Bash(python 0-scripts/wrapper.py*)",
+      "Bash(PYTHONIOENCODING=utf-8 python 0-scripts/wrapper.py*)",
+      "Bash(cd ~/code/<business-project> && python 0-scripts/wrapper.py*)",
+      "Bash(cd ~/code/<business-project> && PYTHONIOENCODING=utf-8 python 0-scripts/wrapper.py*)"
     ]
   }
 }

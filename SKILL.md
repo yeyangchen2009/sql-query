@@ -22,25 +22,39 @@ description: 用 Python 通过 MySQL 协议（pymysql）连接 Doris / MySQL / T
 
 ### 1. 安装脚本（首次）
 
-把本 skill 的 `scripts/db_query.py` 放到项目的 `0-scripts/` 或任意约定位置。两种方式：
+推荐在项目里放一个薄壳，调用本 skill 的脚本。不要把整个 skill 文件夹复制进每个项目反复改，否则版本容易发散。
 
-- **方式 A（推荐）**：在项目里放一个 5 行薄壳，调用本 skill 的脚本。这样 skill 升级时所有项目自动生效，不用逐个同步。
+本 skill 已提供薄壳模板：
 
-  ```python
-  # 0-scripts/db_query.py
-  import os
-  import subprocess
-  import sys
+```text
+templates/0-scripts/wrapper.py
+```
 
-  PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-  env = os.environ.copy()
-  env.setdefault("SQL_QUERY_ENV_PATH", os.path.join(PROJECT_ROOT, ".env"))
+复制到业务项目的 `0-scripts/` 下：
 
-  SKILL_SCRIPT = r"<skill-repo-path>/scripts/db_query.py"
-  subprocess.run([sys.executable, SKILL_SCRIPT] + sys.argv[1:], env=env)
-  ```
+```bash
+cp <skill-repo-path>/templates/0-scripts/wrapper.py 0-scripts/wrapper.py
+```
 
-- **方式 B**：直接把 `db_query.py` 复制进项目，独立维护。简单但版本会发散。
+如果当前项目已经习惯叫 `doris_query.py`，也可以复制成：
+
+```bash
+cp <skill-repo-path>/templates/0-scripts/wrapper.py 0-scripts/doris_query.py
+```
+
+薄壳会做三件事：
+
+1. 定位当前项目根目录
+2. 设置 `SQL_QUERY_ENV_PATH` 指向当前项目 `.env`
+3. 调用共享的 `<skill-repo-path>/scripts/db_query.py` 并透传所有命令行参数
+
+如果同事电脑上的 skill 路径不同，可以设置环境变量覆盖：
+
+```bash
+SQL_QUERY_SKILL=~/code/other-skills/sql-query/scripts/db_query.py
+```
+
+不推荐方式：直接把 `scripts/db_query.py` 复制进每个项目独立维护。这样简单但版本会发散。
 
 ### 2. 配置 `.env`
 
@@ -60,12 +74,14 @@ DB_DATABASE=ods
 
 ### 3. 配置 Claude Code 免确认（可选但强烈推荐）
 
-把下面这段加进项目的 `.claude/settings.local.json` 的 `permissions.allow`，让 Claude 跑这个脚本时不再每次问 yes：
+把下面这段加进项目的 `.claude/settings.local.json` 的 `permissions.allow`，让 Claude 跑项目薄壳时不再每次问 yes。
+
+注意：allow 规则应该写业务项目里的薄壳命令，不是 skill 仓库里的 `scripts/db_query.py`。如果实际命令是 `python 0-scripts/wrapper.py ...`，就允许 `0-scripts/wrapper.py*`；如果薄壳复制成 `doris_query.py`，就把文件名同步改成 `doris_query.py`：
 
 ```json
-"Bash(python 0-scripts/db_query.py*)",
-"Bash(python D:/<project-path>/0-scripts/db_query.py*)",
-"Bash(PYTHONIOENCODING=utf-8 python 0-scripts/db_query.py*)"
+"Bash(python 0-scripts/wrapper.py*)",
+"Bash(python ~/code/<project-path>/0-scripts/wrapper.py*)",
+"Bash(PYTHONIOENCODING=utf-8 python 0-scripts/wrapper.py*)"
 ```
 
 末尾的 `*` 是通配，覆盖所有 flag 组合（`--sql/--table/--file/--list-tables/--describe/--database/--format/--limit/--no-headers`）。
@@ -74,22 +90,22 @@ DB_DATABASE=ods
 
 ```bash
 # 直接执行 SQL
-python 0-scripts/db_query.py --sql "SELECT COUNT(*) FROM ods.xxx"
+python 0-scripts/wrapper.py --sql "SELECT COUNT(*) FROM ods.xxx"
 
 # 读整张表前 10 行
-python 0-scripts/db_query.py --table ods.xxx --limit 10
+python 0-scripts/wrapper.py --table ods.xxx --limit 10
 
 # 读表用裸表名 + 指定库, 导出 CSV
-python 0-scripts/db_query.py --table xxx --database ods --format csv > out.csv
+python 0-scripts/wrapper.py --table xxx --database ods --format csv > out.csv
 
 # 列出 DWS 库所有表
-python 0-scripts/db_query.py --list-tables --database dws
+python 0-scripts/wrapper.py --list-tables --database dws
 
 # 看表结构
-python 0-scripts/db_query.py --describe ods.xxx
+python 0-scripts/wrapper.py --describe ods.xxx
 
 # 跑 SQL 文件, 导出 JSON
-python 0-scripts/db_query.py --file path/to/query.sql --format json > out.json
+python 0-scripts/wrapper.py --file path/to/query.sql --format json > out.json
 ```
 
 ## 五种主参数（互斥）
@@ -129,6 +145,7 @@ IDE 适合交互式探索，本 skill 适合「命令行 / 脚本化取数」：
 ## bundled 文件
 
 - `scripts/db_query.py` — 主脚本
+- `templates/0-scripts/wrapper.py` — 项目薄壳模板，默认复制到业务项目 `0-scripts/wrapper.py`
 - `templates/env.template` — `.env` 模板
 - `templates/settings.snippet.json` — Claude Code 权限片段
 - `README.md` — 给人看的仓库说明
