@@ -169,6 +169,11 @@ python 0-scripts/wrapper.py --sql "SELECT ..."
 2. 打开 `~/code/claude-skills/sql-query/templates/.claude/settings.snippet.json`
 3. 只把 snippet 里的 `permissions.allow` 数组合并进去
 4. 如果薄壳文件名不是 `wrapper.py`，把规则里的文件名同步改掉
+5. 重启 Claude Code，让当前项目的权限配置重新加载
+
+如果 `.claude/settings.local.json` 是当前 Claude Code 会话中刚创建或刚修改的，当前会话可能不会立即重新加载它。配置完成后请重启 Claude Code，再验证是否还会弹 yes。
+
+重启后如果仍然弹 yes，优先检查 allow 规则是否覆盖 Claude 实际执行的 Bash 命令。比如 allow 里只有 `python 0-scripts/wrapper.py ...`，但实际执行的是 `cd ~/code/project && python 0-scripts/wrapper.py ...` 或 `python ~/code/project/0-scripts/wrapper.py ...`，仍然不会命中。
 
 常用规则：
 
@@ -195,7 +200,8 @@ flowchart TD
     B --> C["复制 env.template<br/>到项目 .env"]
     C --> D["填写 DB_HOST / DB_USER / DB_PASSWORD"]
     D --> E["合并 .claude/settings.snippet.json<br/>到 .claude/settings.local.json"]
-    E --> F["运行 SELECT 1 smoke test"]
+    E --> R["重启 Claude Code<br/>重新加载权限配置"]
+    R --> F["运行 SELECT 1 smoke test"]
     F --> G{"是否成功?"}
     G -->|"成功"| H["开始查表 / 跑 SQL / 导出数据"]
     G -->|"失败"| I["检查 skill 路径 / .env / pymysql / 权限 allow"]
@@ -205,6 +211,7 @@ flowchart TD
     style C fill:#1a3a2a,stroke:#a5d6a7,stroke-width:2px,color:#e0e0e0
     style D fill:#1a3a2a,stroke:#a5d6a7,stroke-width:2px,color:#e0e0e0
     style E fill:#2a1a3a,stroke:#ce93d8,stroke-width:2px,color:#e0e0e0
+    style R fill:#2a1a3a,stroke:#ce93d8,stroke-width:2px,color:#e0e0e0
     style F fill:#1a3a2a,stroke:#4caf50,stroke-width:2px,color:#e0e0e0
     style G fill:#3a2a1a,stroke:#ffcc80,stroke-width:2px,color:#e0e0e0
     style H fill:#1a3a2a,stroke:#4caf50,stroke-width:2px,color:#e0e0e0
