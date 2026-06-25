@@ -1,0 +1,13 @@
+{
+  "_comment": "把下面 allow 数组里的几行复制到项目 .claude/settings.local.json 的 permissions.allow 里, Claude 跑这个脚本时就不再每次问 yes",
+  "permissions": {
+    "allow": [
+      "Bash(python 0-scripts/db_query.py*)",
+      "Bash(python D:/<project-path>/0-scripts/db_query.py*)",
+      "Bash(PYTHONIOENCODING=utf-8 python 0-scripts/db_query.py*)",
+      "Bash(PYTHONIOENCODING=utf-8 python D:/<project-path>/0-scripts/db_query.py*)",
+      "Bash(cd D:/<project-path> && python 0-scripts/db_query.py*)",
+      "Bash(cd D:/<project-path> && PYTHONIOENCODING=utf-8 python 0-scripts/db_query.py*)"
+    ]
+  }
+}
