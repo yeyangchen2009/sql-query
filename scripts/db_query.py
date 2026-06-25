@@ -6,8 +6,8 @@ db_query.py - 通过 MySQL 协议读取 Doris / MySQL / TiDB 的命令行查询�
   - (未来) postgres        → psycopg2 驱动
 
 配置:
-  - 从项目根目录 .env 读取连接信息 (DB_TYPE/DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_DATABASE)
-  - 项目根目录 = 本脚本所在目录的上一级 (自动推导)
+  - 默认从脚本所在 skill 目录上一级读取 .env
+  - 被项目薄壳调用时, 可通过 SQL_QUERY_ENV_PATH 指向项目自己的 .env
 
 用法:
   python db_query.py --sql "SELECT ..."
@@ -27,7 +27,7 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
-ENV_PATH = os.path.join(PROJECT_ROOT, ".env")
+ENV_PATH = os.environ.get("SQL_QUERY_ENV_PATH", os.path.join(PROJECT_ROOT, ".env"))
 
 
 # ---------------------------------------------------------------------------

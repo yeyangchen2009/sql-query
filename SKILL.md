@@ -28,9 +28,16 @@ description: 用 Python 通过 MySQL 协议（pymysql）连接 Doris / MySQL / T
 
   ```python
   # 0-scripts/db_query.py
-  import subprocess, sys
+  import os
+  import subprocess
+  import sys
+
+  PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+  env = os.environ.copy()
+  env.setdefault("SQL_QUERY_ENV_PATH", os.path.join(PROJECT_ROOT, ".env"))
+
   SKILL_SCRIPT = r"<skill-repo-path>/scripts/db_query.py"
-  subprocess.run([sys.executable, SKILL_SCRIPT] + sys.argv[1:])
+  subprocess.run([sys.executable, SKILL_SCRIPT] + sys.argv[1:], env=env)
   ```
 
 - **方式 B**：直接把 `db_query.py` 复制进项目，独立维护。简单但版本会发散。
@@ -42,10 +49,10 @@ description: 用 Python 通过 MySQL 协议（pymysql）连接 Doris / MySQL / T
 ```ini
 # 数据库类型: mysql | doris | tidb （都用 MySQL 协议，pymysql 驱动）
 DB_TYPE=doris
-DB_HOST=192.168.50.89
+DB_HOST=127.0.0.1
 DB_PORT=9030
-DB_USER=doris_dev
-DB_PASSWORD=consun123456
+DB_USER=your_user
+DB_PASSWORD=your_password
 DB_DATABASE=ods
 ```
 

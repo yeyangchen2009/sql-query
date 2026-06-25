@@ -32,9 +32,16 @@ git submodule add <repo-url> .claude/skills/sql-query
 在项目的 `0-scripts/db_query.py` 写一个 5 行薄壳：
 
 ```python
-import subprocess, sys, os
+import os
+import subprocess
+import sys
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+env = os.environ.copy()
+env.setdefault("SQL_QUERY_ENV_PATH", os.path.join(PROJECT_ROOT, ".env"))
+
 SKILL_SCRIPT = os.path.expanduser("~/claude-skills/sql-query/scripts/db_query.py")
-subprocess.run([sys.executable, SKILL_SCRIPT] + sys.argv[1:])
+subprocess.run([sys.executable, SKILL_SCRIPT] + sys.argv[1:], env=env)
 ```
 
 这样 skill 升级时所有项目自动生效。
