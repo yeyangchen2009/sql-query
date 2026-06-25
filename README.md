@@ -14,7 +14,7 @@
 | `scripts/db_query.py` | 真正执行查询的通用脚本 |
 | `templates/0-scripts/wrapper.py` | 复制到业务项目 `0-scripts/` 的薄壳模板 |
 | `templates/env.template` | 复制成业务项目 `.env` 的配置模板 |
-| `templates/settings.snippet.json` | 合并到业务项目 `.claude/settings.local.json` 的权限片段 |
+| `templates/.claude/settings.snippet.json` | 合并到业务项目 `.claude/settings.local.json` 的权限片段 |
 
 任何使用 MySQL 协议的数仓项目（Doris / MySQL / TiDB）都能复用。
 
@@ -40,7 +40,7 @@
 │       └── templates/
 │           ├── 0-scripts/wrapper.py
 │           ├── env.template
-│           └── settings.snippet.json
+│           └── .claude/settings.snippet.json
 ├── project-a/
 │   ├── .env
 │   └── 0-scripts/wrapper.py
@@ -143,7 +143,7 @@ DB_DATABASE=ods
 
 ### 4. 合并 Claude Code 权限片段
 
-`templates/settings.snippet.json` 是片段，不建议直接复制覆盖项目的 `.claude/settings.local.json`。
+`templates/.claude/settings.snippet.json` 是片段，不建议直接复制覆盖项目的 `.claude/settings.local.json`。
 
 原因是项目里可能已经有其他 allow 规则，直接覆盖会把旧规则删掉。
 
@@ -166,7 +166,7 @@ python 0-scripts/wrapper.py --sql "SELECT ..."
 推荐做法：
 
 1. 打开业务项目现有的 `.claude/settings.local.json`
-2. 打开 `~/code/claude-skills/sql-query/templates/settings.snippet.json`
+2. 打开 `~/code/claude-skills/sql-query/templates/.claude/settings.snippet.json`
 3. 只把 snippet 里的 `permissions.allow` 数组合并进去
 4. 如果薄壳文件名不是 `wrapper.py`，把规则里的文件名同步改掉
 
@@ -194,7 +194,7 @@ flowchart TD
     A["clone / 获取 sql-query skill"] --> B["复制 templates/0-scripts/wrapper.py<br/>到项目 0-scripts/wrapper.py"]
     B --> C["复制 env.template<br/>到项目 .env"]
     C --> D["填写 DB_HOST / DB_USER / DB_PASSWORD"]
-    D --> E["合并 settings.snippet.json<br/>到 .claude/settings.local.json"]
+    D --> E["合并 .claude/settings.snippet.json<br/>到 .claude/settings.local.json"]
     E --> F["运行 SELECT 1 smoke test"]
     F --> G{"是否成功?"}
     G -->|"成功"| H["开始查表 / 跑 SQL / 导出数据"]
