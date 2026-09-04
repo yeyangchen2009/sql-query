@@ -1,6 +1,6 @@
 # sql-query skill
 
-> 通过 MySQL 协议读 Doris / MySQL / TiDB 的命令行查询助手，可作为 Claude Code skill 使用。
+> 通过 MySQL / TDS 协议读 Doris / MySQL / TiDB / SQL Server 的命令行查询助手，可作为 Claude Code skill 使用。
 
 ## 这是什么
 
@@ -16,7 +16,7 @@
 | `templates/env.template` | 复制成业务项目 `.env` 的配置模板 |
 | `templates/.claude/settings.snippet.json` | 合并到业务项目 `.claude/settings.local.json` 的权限片段 |
 
-任何使用 MySQL 协议的数仓项目（Doris / MySQL / TiDB）都能复用。
+任何使用 MySQL 协议（Doris / MySQL / TiDB）或 TDS 协议（SQL Server）的数据库项目都能复用，且同一个项目可同时配多个连接。
 
 ## 推荐接入方式
 
@@ -56,16 +56,18 @@
 flowchart TD
     A["业务项目 A<br/>0-scripts/wrapper.py"] --> S["共享 sql-query skill<br/>scripts/db_query.py"]
     B["业务项目 B<br/>0-scripts/wrapper.py"] --> S
-    A --> EA["项目 A .env"]
-    B --> EB["项目 B .env"]
-    S --> D["Doris / MySQL / TiDB"]
+    A --> EA["项目 A .env<br/>DB_* / RX_DB_* ..."]
+    B --> EB["项目 B .env<br/>DB_* / OTC_DB_* ..."]
+    S --> D1["pymysql<br/>Doris / MySQL / TiDB"]
+    S --> D2["pymssql<br/>SQL Server"]
 
     style A fill:#1a2a3a,stroke:#90caf9,stroke-width:2px,color:#e0e0e0
     style B fill:#1a2a3a,stroke:#90caf9,stroke-width:2px,color:#e0e0e0
     style S fill:#2a1a3a,stroke:#ce93d8,stroke-width:2px,color:#e0e0e0
     style EA fill:#1a3a2a,stroke:#a5d6a7,stroke-width:2px,color:#e0e0e0
     style EB fill:#1a3a2a,stroke:#a5d6a7,stroke-width:2px,color:#e0e0e0
-    style D fill:#3a2a1a,stroke:#ffcc80,stroke-width:2px,color:#e0e0e0
+    style D1 fill:#3a2a1a,stroke:#ffcc80,stroke-width:2px,color:#e0e0e0
+    style D2 fill:#3a2a1a,stroke:#ffcc80,stroke-width:2px,color:#e0e0e0
 ```
 
 ## 安装到新项目
@@ -141,6 +143,37 @@ DB_DATABASE=ods
 
 `.env` 里是数据库账号密码，不要提交到 Git。
 
+### 3.1 一个项目配多个数据库
+
+默认连接用 `DB_*` 前缀，其他连接用 `<NAME>_DB_*` 前缀，命名规范一致即可任意扩展：
+
+```ini
+# 默认连接（不加 --conn 时用它）
+DB_TYPE=doris
+DB_HOST=192.168.50.89
+DB_PORT=9030
+DB_USER=doris_dev
+DB_PASSWORD=xxx
+DB_DATABASE=ods
+
+# 连接 rx（--conn rx）
+RX_DB_TYPE=sqlserver
+RX_DB_HOST=192.168.22.26
+RX_DB_PORT=1433
+RX_DB_USER=LC0019999
+RX_DB_PASSWORD=xxx
+RX_DB_DATABASE=cwbase002
+```
+
+查询时用 `--conn` 切换，用 `--list-conns` 查看已配置的连接：
+
+```bash
+python 0-scripts/wrapper.py --list-conns
+python 0-scripts/wrapper.py --conn rx --sql "SELECT TOP 10 * FROM dbo.ORG_UNIT"
+```
+
+注意 SQL Server 手写 SQL 要用 `SELECT TOP N` 而不是 `LIMIT N`；`--table` / `--list-tables` / `--describe` 会自动按连接类型适配方言。
+
 ### 4. 合并 Claude Code 权限片段
 
 `templates/.claude/settings.snippet.json` 是片段，不建议直接复制覆盖项目的 `.claude/settings.local.json`。
@@ -198,10 +231,10 @@ python 0-scripts/wrapper.py --sql "SELECT ..."
 flowchart TD
     A["clone / 获取 sql-query skill"] --> B["复制 templates/0-scripts/wrapper.py<br/>到项目 0-scripts/wrapper.py"]
     B --> C["复制 env.template<br/>到项目 .env"]
-    C --> D["填写 DB_HOST / DB_USER / DB_PASSWORD"]
+    C --> D["填写 DB_HOST / DB_USER / DB_PASSWORD<br/>多库再加 &lt;NAME&gt;_DB_*"]
     D --> E["合并 .claude/settings.snippet.json<br/>到 .claude/settings.local.json"]
     E --> R["重启 Claude Code<br/>重新加载权限配置"]
-    R --> F["运行 SELECT 1 smoke test"]
+    R --> F["运行 SELECT 1 smoke test<br/>多连接先跑 --list-conns"]
     F --> G{"是否成功?"}
     G -->|"成功"| H["开始查表 / 跑 SQL / 导出数据"]
     G -->|"失败"| I["检查 skill 路径 / .env / pymysql / 权限 allow"]
@@ -221,8 +254,14 @@ flowchart TD
 ## 使用
 
 ```bash
-# 直接执行 SQL
+# 列出 .env 里配置的所有连接
+python 0-scripts/wrapper.py --list-conns
+
+# 直接执行 SQL（默认连接）
 python 0-scripts/wrapper.py --sql "SELECT COUNT(*) FROM ods.xxx"
+
+# 指定连接执行 SQL
+python 0-scripts/wrapper.py --conn rx --sql "SELECT TOP 10 * FROM dbo.ORG_UNIT"
 
 # 读整张表前 10 行
 python 0-scripts/wrapper.py --table ods.xxx --limit 10
@@ -240,9 +279,9 @@ python 0-scripts/wrapper.py --describe ods.xxx
 python 0-scripts/wrapper.py --file query.sql --format json > out.json
 ```
 
-五种主参数互斥：`--sql` / `--file` / `--table` / `--list-tables` / `--describe`。
+六种主参数互斥：`--sql` / `--file` / `--table` / `--list-tables` / `--describe` / `--list-conns`。
 
-辅助参数：`--database` / `--format tab|csv|json` / `--limit N` / `--no-headers`。
+辅助参数：`--conn` / `--database` / `--format tab|csv|json` / `--limit N` / `--no-headers`。
 
 ## 多项目和跨电脑怎么选
 
@@ -258,7 +297,8 @@ python 0-scripts/wrapper.py --file query.sql --format json > out.json
 ## 依赖
 
 ```bash
-pip install pymysql
+pip install pymysql   # MySQL / Doris / TiDB
+pip install pymssql   # SQL Server
 ```
 
 未来支持 PostgreSQL 时再装 `psycopg2`。
@@ -276,9 +316,10 @@ pip install pymysql
 | mysql | pymysql | 已支持 |
 | doris | pymysql | 已支持 |
 | tidb | pymysql | 已支持 |
+| sqlserver / mssql | pymssql | 已支持 |
 | postgres | psycopg2 | 预留 |
 
-加新协议只需在 `db_query.py` 的 `DRIVER_MAP` 和 `connect()` 里扩展。
+加新协议只需在 `db_query.py` 的 `DRIVER_MAP`、`DEFAULT_PORT` 和 `connect()` 里扩展。
 
 ## 故障排查
 
@@ -290,6 +331,9 @@ pip install pymysql
 | `Access denied` | `.env` 的 `DB_USER` / `DB_PASSWORD` 是否正确 |
 | `Unknown column` | 用 `--describe` 看表结构再核对字段 |
 | `No module named 'pymysql'` | 执行 `pip install pymysql` |
+| `No module named 'pymssql'` | 执行 `pip install pymssql` |
+| `找不到连接配置: xxx` | 用 `--list-conns` 看可用连接，或在 `.env` 补 `<NAME>_DB_*` |
+| SQL Server 报 `LIMIT` 附近语法错误 | SQL Server 用 `SELECT TOP N`，不支持 `LIMIT` |
 
 ## 许可
 

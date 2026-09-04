@@ -1,6 +1,6 @@
 ---
 name: sql-query
-description: 用 Python 通过 MySQL 协议（pymysql）连接 Doris / MySQL / TiDB 等数仓，读取表数据、执行任意 SQL、导出 CSV / JSON。当用户提到「读表 / 查数据 / 跑一下 SQL / 验证 ETL 结果 / 导出 CSV / 看下这张表 / 列出库里的表 / 看表结构 / DESCRIBE / SHOW TABLES」等需求时，务必使用本 skill。即使用户没明说「doris_query」或「db_query」，只要意图是「从 SQL 数仓取数据到命令行」，就触发本 skill。
+description: 用 Python 连接 Doris / MySQL / TiDB / SQL Server 等数据库，读取表数据、执行任意 SQL、导出 CSV / JSON。支持一个项目配多个数据库连接（`--conn`）。当用户提到「读表 / 查数据 / 跑一下 SQL / 验证 ETL 结果 / 导出 CSV / 看下这张表 / 列出库里的表 / 看表结构 / DESCRIBE / SHOW TABLES」等需求时，务必使用本 skill。即使用户没明说「doris_query」或「db_query」，只要意图是「从 SQL 数据库取数据到命令行」，就触发本 skill。
 ---
 
 # sql-query
@@ -30,6 +30,47 @@ python 0-scripts/wrapper.py ...
 3. 查询目标是否清楚：库名、表名、字段、时间范围、输出格式
 
 如果用户只给了表名但没说库名，优先根据上下文判断；不确定时用 `--database` 或先列库表，不要猜业务含义。
+
+## 多数据库连接
+
+一个项目的 `.env` 可以配多个连接：默认连接用 `DB_*` 前缀，其他连接用 `<NAME>_DB_*` 前缀。
+
+不确定当前项目有哪些连接时，先列出来：
+
+```bash
+python 0-scripts/wrapper.py --list-conns
+```
+
+输出依次是连接名、类型、地址、默认库：
+
+```text
+default	doris		192.168.50.89:9030	ods
+rx	sqlserver	192.168.22.26:1433	cwbase002
+```
+
+查非默认连接时加 `--conn <name>`：
+
+```bash
+python 0-scripts/wrapper.py --conn rx --sql "SELECT TOP 10 * FROM dbo.ORG_UNIT"
+```
+
+用户说的库名对应哪个连接不明确时，先 `--list-conns` 确认，不要默认拉默认连接。
+
+### SQL Server 方言差异
+
+`--table` / `--list-tables` / `--describe` 会自动按连接类型适配方言，无需手写。
+
+但手写 `--sql` 时必须用目标数据库的语法：
+
+| 需求 | MySQL / Doris | SQL Server |
+|------|---------------|------------|
+| 限行 | `LIMIT 10` | `SELECT TOP 10 ...` |
+| 当前时间 | `NOW()` | `GETDATE()` |
+| 列出表 | `SHOW TABLES` | `INFORMATION_SCHEMA.TABLES` |
+| 看字段 | `DESCRIBE t` | `INFORMATION_SCHEMA.COLUMNS` |
+| 引用标识符 | `` `col` `` | `[col]` |
+
+在 SQL Server 连接上写 `LIMIT` 会直接报错，这是最常见的误用。
 
 ## 常用命令
 
@@ -107,7 +148,7 @@ JSON 模式下行数提示在 stderr，重定向后的 JSON 文件应保持纯�
 
 ## 参数速查
 
-五种主参数互斥，只选一个：
+六种主参数互斥，只选一个：
 
 | 参数 | 用途 |
 |------|------|
@@ -116,12 +157,14 @@ JSON 模式下行数提示在 stderr，重定向后的 JSON 文件应保持纯�
 | `--table <table>` | 快速读取表数据 |
 | `--list-tables` | 列出指定库的表 |
 | `--describe <table>` | 查看表结构 |
+| `--list-conns` | 列出 `.env` 里配置的所有连接 |
 
 辅助参数：
 
 | 参数 | 用途 |
 |------|------|
-| `--database <db>` | 指定默认库或覆盖 `.env` 默认库 |
+| `--conn <name>` | 选择连接，缺省为 `default`（`.env` 的 `DB_*`） |
+| `--database <db>` | 指定默认库或覆盖连接默认库 |
 | `--format tab|csv|json` | 指定输出格式，默认 `tab` |
 | `--limit N` | 限制 `--table` 返回行数 |
 | `--no-headers` | tab / csv 输出时不打印表头 |
@@ -200,6 +243,9 @@ v1      v2
 | 找不到 `.env` | 确认在业务项目根目录执行，且项目根目录有 `.env` |
 | 找不到 skill 脚本 | 检查薄壳里的默认路径，或设置 `SQL_QUERY_SKILL` |
 | `No module named 'pymysql'` | 安装依赖：`pip install pymysql` |
+| `No module named 'pymssql'` | 安装依赖：`pip install pymssql` |
+| 找不到连接配置 | 用 `--list-conns` 看可用连接名，或在 `.env` 补 `<NAME>_DB_*` |
+| SQL Server 报 `LIMIT` 语法错 | SQL Server 用 `SELECT TOP N`，不支持 `LIMIT` |
 | `Access denied` | 检查 `.env` 里的账号密码 |
 | `Unknown column` | 先用 `--describe` 查看表结构 |
 
