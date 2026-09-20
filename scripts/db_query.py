@@ -1,10 +1,10 @@
 """
-db_query.py - 多数据库命令行查询助手 (Doris / MySQL / TiDB / SQL Server)
+db_query.py - 多数据库命令行查询助手 (Doris / MySQL / TiDB / SQL Server / PostgreSQL)
 
 支持 DB_TYPE:
   - mysql / doris / tidb    → pymysql 驱动
   - sqlserver / mssql       → pymssql 驱动
-  - (未来) postgres          → psycopg2 驱动
+  - postgres / pg / pgsql   → psycopg2 驱动
 
 配置:
   - 默认从脚本所在 skill 目录上一级读取 .env
@@ -44,13 +44,16 @@ DRIVER_MAP = {
     "tidb": "pymysql",
     "sqlserver": "pymssql",
     "mssql": "pymssql",
-    # "postgres": "psycopg2",  # 预留
+    "postgres": "psycopg2",
+    "pg": "psycopg2",
+    "pgsql": "psycopg2",
 }
 
 # 每种驱动的默认端口
 DEFAULT_PORT = {
     "pymysql": 3306,
     "pymssql": 1433,
+    "psycopg2": 5432,
 }
 
 # 一个连接配置认识的字段后缀
@@ -158,6 +161,20 @@ def connect(cfg, database=None, conn=None):
             timeout=300,
         )
 
+    if driver == "psycopg2":
+        import psycopg2
+        conn = psycopg2.connect(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            dbname=dbname or "",
+            connect_timeout=10,
+        )
+        # psycopg2 默认 autocommit=False; SQL 查询场景一般不需要事务,打开 autocommit
+        conn.autocommit = True
+        return conn
+
     # 预留: 其他驱动的分支写在这里
     raise NotImplementedError(f"driver {driver} 未实现")
 
@@ -170,9 +187,11 @@ def build_sql(args, driver="pymysql"):
     """根据命令行参数返回 (sql, database_override).
 
     driver 决定方言: pymysql 用 SHOW TABLES / DESCRIBE / LIMIT,
-    pymssql 用 INFORMATION_SCHEMA / SELECT TOP N.
+    pymssql 用 INFORMATION_SCHEMA / SELECT TOP N,
+    psycopg2 用 information_schema / LIMIT N (MySQL 风格 LIMIT 也支持).
     """
     is_mssql = driver == "pymssql"
+    is_pg = driver == "psycopg2"
 
     if args.sql:
         return args.sql, None
@@ -189,6 +208,13 @@ def build_sql(args, driver="pymysql"):
                 "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE "
                 "FROM INFORMATION_SCHEMA.TABLES ORDER BY TABLE_SCHEMA, TABLE_NAME"
             ), args.database
+        if is_pg:
+            return (
+                "SELECT table_schema, table_name, table_type "
+                "FROM information_schema.tables "
+                "WHERE table_schema NOT IN ('pg_catalog', 'information_schema') "
+                "ORDER BY table_schema, table_name"
+            ), args.database
         db = args.database or "information_schema"
         return "SHOW TABLES", db
 
@@ -204,12 +230,24 @@ def build_sql(args, driver="pymysql"):
                 "FROM INFORMATION_SCHEMA.COLUMNS "
                 f"WHERE TABLE_NAME = '{table}'{schema_filter} ORDER BY ORDINAL_POSITION"
             ), args.database
+        if is_pg:
+            # 同样支持 schema.table 与裸名
+            parts = args.describe.split(".")
+            table = parts[-1]
+            schema_filter = f" AND table_schema = '{parts[-2]}'" if len(parts) > 1 else ""
+            return (
+                "SELECT column_name, data_type, character_maximum_length, "
+                "numeric_precision, numeric_scale, is_nullable, column_default "
+                "FROM information_schema.columns "
+                f"WHERE table_name = '{table}'{schema_filter} ORDER BY ordinal_position"
+            ), args.database
         return f"DESCRIBE {args.describe}", args.database
 
     if args.table:
         if is_mssql:
             top = f"TOP {args.limit} " if args.limit else ""
             return f"SELECT {top}* FROM {args.table}", args.database
+        # pymysql / psycopg2 都用 LIMIT N
         limit_clause = f"LIMIT {args.limit}" if args.limit else ""
         return f"SELECT * FROM {args.table} {limit_clause}".strip(), args.database
 
@@ -260,7 +298,7 @@ def run_and_print(cur, sql, fmt="tab", limit=None, headers=True):
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(
-        description="多数据库命令行查询助手 (Doris/MySQL/TiDB/SQL Server)",
+        description="多数据库命令行查询助手 (Doris/MySQL/TiDB/SQL Server/PostgreSQL)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     g = ap.add_mutually_exclusive_group(required=True)
