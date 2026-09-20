@@ -45,6 +45,7 @@ DRIVER_MAP = {
     "sqlserver": "pymssql",
     "mssql": "pymssql",
     "postgres": "psycopg2",
+    "postgresql": "psycopg2",
     "pg": "psycopg2",
     "pgsql": "psycopg2",
 }
