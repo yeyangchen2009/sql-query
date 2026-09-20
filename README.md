@@ -318,7 +318,7 @@ pip install psycopg2-binary # PostgreSQL (推荐 binary 包, 含 libpq, 不需�
 | doris | pymysql | 已支持 |
 | tidb | pymysql | 已支持 |
 | sqlserver / mssql | pymssql | 已支持 |
-| postgres / pg / pgsql | psycopg2 | 已支持 |
+| postgres / postgresql / pg / pgsql | psycopg2 | 已支持 |
 
 加新协议只需在 `db_query.py` 的 `DRIVER_MAP`、`DEFAULT_PORT` 和 `connect()` 里扩展。
 
