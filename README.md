@@ -1,6 +1,6 @@
 # sql-query skill
 
-> 通过 MySQL / TDS 协议读 Doris / MySQL / TiDB / SQL Server 的命令行查询助手，可作为 Claude Code skill 使用。
+> 通过 MySQL / TDS 协议读 Doris / MySQL / TiDB / SQL Server / PostgreSQL 的命令行查询助手，可作为 Claude Code skill 使用。
 
 ## 这是什么
 
@@ -16,7 +16,7 @@
 | `templates/env.template` | 复制成业务项目 `.env` 的配置模板 |
 | `templates/.claude/settings.snippet.json` | 合并到业务项目 `.claude/settings.local.json` 的权限片段 |
 
-任何使用 MySQL 协议（Doris / MySQL / TiDB）或 TDS 协议（SQL Server）的数据库项目都能复用，且同一个项目可同时配多个连接。
+任何使用 MySQL 协议（Doris / MySQL / TiDB）、TDS 协议（SQL Server）或 PG 协议（PostgreSQL）的数据库项目都能复用，且同一个项目可同时配多个连接。
 
 ## 推荐接入方式
 
@@ -60,6 +60,7 @@ flowchart TD
     B --> EB["项目 B .env<br/>DB_* / OTC_DB_* ..."]
     S --> D1["pymysql<br/>Doris / MySQL / TiDB"]
     S --> D2["pymssql<br/>SQL Server"]
+    S --> D3["psycopg2<br/>PostgreSQL"]
 
     style A fill:#1a2a3a,stroke:#90caf9,stroke-width:2px,color:#e0e0e0
     style B fill:#1a2a3a,stroke:#90caf9,stroke-width:2px,color:#e0e0e0
@@ -68,6 +69,7 @@ flowchart TD
     style EB fill:#1a3a2a,stroke:#a5d6a7,stroke-width:2px,color:#e0e0e0
     style D1 fill:#3a2a1a,stroke:#ffcc80,stroke-width:2px,color:#e0e0e0
     style D2 fill:#3a2a1a,stroke:#ffcc80,stroke-width:2px,color:#e0e0e0
+    style D3 fill:#3a2a1a,stroke:#ffcc80,stroke-width:2px,color:#e0e0e0
 ```
 
 ## 安装到新项目
@@ -172,7 +174,7 @@ python 0-scripts/wrapper.py --list-conns
 python 0-scripts/wrapper.py --conn rx --sql "SELECT TOP 10 * FROM dbo.ORG_UNIT"
 ```
 
-注意 SQL Server 手写 SQL 要用 `SELECT TOP N` 而不是 `LIMIT N`；`--table` / `--list-tables` / `--describe` 会自动按连接类型适配方言。
+注意 SQL Server 手写 SQL 要用 `SELECT TOP N` 而不是 `LIMIT N`；`--table` / `--list-tables` / `--describe` 会自动按连接类型适配方言。PostgreSQL 与 MySQL 一样用 `LIMIT N`，但 `--list-tables` 默认排除 `pg_catalog` 和 `information_schema` 内置表。
 
 ### 4. 合并 Claude Code 权限片段
 
@@ -297,11 +299,10 @@ python 0-scripts/wrapper.py --file query.sql --format json > out.json
 ## 依赖
 
 ```bash
-pip install pymysql   # MySQL / Doris / TiDB
-pip install pymssql   # SQL Server
+pip install pymysql       # MySQL / Doris / TiDB
+pip install pymssql       # SQL Server
+pip install psycopg2-binary # PostgreSQL (推荐 binary 包, 含 libpq, 不需本地编译)
 ```
-
-未来支持 PostgreSQL 时再装 `psycopg2`。
 
 ## 为什么是 skill 而不是 pip 包
 
@@ -317,7 +318,7 @@ pip install pymssql   # SQL Server
 | doris | pymysql | 已支持 |
 | tidb | pymysql | 已支持 |
 | sqlserver / mssql | pymssql | 已支持 |
-| postgres | psycopg2 | 预留 |
+| postgres / pg / pgsql | psycopg2 | 已支持 |
 
 加新协议只需在 `db_query.py` 的 `DRIVER_MAP`、`DEFAULT_PORT` 和 `connect()` 里扩展。
 
