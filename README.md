@@ -102,27 +102,39 @@ cp ~/code/claude-skills/sql-query/templates/0-scripts/wrapper.py 0-scripts/doris
 
 薄壳的作用只有一个：把当前项目的 `.env` 路径传给共享 skill 脚本，然后转发所有命令行参数。
 
-薄壳模板核心逻辑：
+薄壳模板核心逻辑（自动探测 skill 路径，复制到新项目通常无需手改）：
 
 ```python
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ENV_PATH = os.path.join(PROJECT_ROOT, ".env")
 
-SKILL_SCRIPT = os.environ.get(
-    "SQL_QUERY_SKILL",
+SKILL_CANDIDATES = [
+    r"D:/Consun/Code/claude-skills/sql-query/scripts/db_query.py",
     os.path.expanduser("~/code/claude-skills/sql-query/scripts/db_query.py"),
-)
+]
+
+def find_skill_script():
+    override = os.environ.get("SQL_QUERY_SKILL")
+    if override:
+        return os.path.normpath(os.path.expanduser(override))
+    for cand in SKILL_CANDIDATES:
+        if os.path.exists(cand):
+            return os.path.normpath(cand)
+    return None
 
 env = os.environ.copy()
 env.setdefault("SQL_QUERY_ENV_PATH", PROJECT_ENV_PATH)
-subprocess.run([sys.executable, SKILL_SCRIPT] + sys.argv[1:], env=env)
+subprocess.run([sys.executable, find_skill_script()] + sys.argv[1:], env=env)
 ```
 
-如果新电脑上的 skill 路径不同，可以设置环境变量 `SQL_QUERY_SKILL`，不用改业务项目代码：
+查找顺序：环境变量 `SQL_QUERY_SKILL` → `SKILL_CANDIDATES` 里第一个存在的路径。
+新电脑 skill 放别处时，**优先设环境变量**，不用改业务项目代码：
 
 ```bash
 SQL_QUERY_SKILL=~/code/other-skills/sql-query/scripts/db_query.py
 ```
+
+或把新路径加进薄壳的 `SKILL_CANDIDATES`。
 
 ### 3. 在业务项目里创建 `.env`
 
@@ -225,6 +237,52 @@ python 0-scripts/wrapper.py --sql "SELECT ..."
 ```
 
 末尾的 `*` 是通配，覆盖所有参数组合。
+
+## 在其他项目接入（复制即用 · 本机）
+
+> 下面是这台机器的**真实路径**；换电脑 clone skill 后改成本机路径，或用环境变量 `SQL_QUERY_SKILL` 覆盖。
+> 端到端真实范例见 [`schedule-analysis`](../../schedule-analysis)：默认 SQL Server + OTC/RX/BI 三个 SQL Server 连接 + 一个 PostgreSQL，PG 摸底文档在 `schedule-analysis/pg/README.md`。
+
+```bash
+cd <你的项目根目录>
+mkdir -p 0-scripts
+# 1) 薄壳（自带路径自动探测）
+cp D:/Consun/Code/claude-skills/sql-query/templates/0-scripts/wrapper.py 0-scripts/wrapper.py
+# 2) .env，再改成你的连接
+cp D:/Consun/Code/claude-skills/sql-query/templates/env.template .env
+```
+
+`.env` 最小可用示例（默认 Doris + 一个 PostgreSQL）：
+
+```ini
+# 默认连接（不加 --conn）
+DB_TYPE=doris
+DB_HOST=192.168.50.89
+DB_PORT=9030
+DB_USER=root
+DB_PASSWORD=
+DB_DATABASE=ods
+
+# PostgreSQL，用 --conn pg 访问
+PG_DB_TYPE=postgres
+PG_DB_HOST=192.168.50.66
+PG_DB_PORT=5432
+PG_DB_USER=test
+PG_DB_PASSWORD=改成你的密码
+PG_DB_DATABASE=crm_marketing_crm_test
+PG_DB_CONNECT_TIMEOUT=15
+PG_DB_READ_TIMEOUT=300
+```
+
+验证三条：
+
+```bash
+python 0-scripts/wrapper.py --list-conns                       # 看到 default + pg
+python 0-scripts/wrapper.py --sql "SELECT 1"                  # 默认连接
+python 0-scripts/wrapper.py --conn pg --sql "SELECT version()" # PG
+```
+
+> 记得把权限片段合并进 `.claude/settings.local.json`（见下一节），再重启 Claude Code。
 
 ## 接入流程图
 
@@ -335,6 +393,7 @@ pip install psycopg2-binary # PostgreSQL (推荐 binary 包, 含 libpq, 不需�
 | `No module named 'pymssql'` | 执行 `pip install pymssql` |
 | `找不到连接配置: xxx` | 用 `--list-conns` 看可用连接，或在 `.env` 补 `<NAME>_DB_*` |
 | SQL Server 报 `LIMIT` 附近语法错误 | SQL Server 用 `SELECT TOP N`，不支持 `LIMIT` |
+| PG 报 `canceling statement due to statement timeout` | `READ_TIMEOUT` 太小或查询确实太慢，调大 `<NAME>_DB_READ_TIMEOUT`（PG 用服务端 `statement_timeout` 实现读超时） |
 
 ## 许可
 

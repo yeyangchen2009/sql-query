@@ -58,7 +58,11 @@ DEFAULT_PORT = {
 }
 
 # 一个连接配置认识的字段后缀
-CONN_KEYS = ("TYPE", "HOST", "PORT", "USER", "PASSWORD", "DATABASE")
+# TIMEOUT 两个键为可选, 不填走默认值; 单位均为秒
+CONN_KEYS = (
+    "TYPE", "HOST", "PORT", "USER", "PASSWORD", "DATABASE",
+    "CONNECT_TIMEOUT", "READ_TIMEOUT",
+)
 
 
 def load_env(path=ENV_PATH):
@@ -135,6 +139,8 @@ def connect(cfg, database=None, conn=None):
     user = c.get("DB_USER", "root")
     password = c.get("DB_PASSWORD", "")
     dbname = database or c.get("DB_DATABASE")
+    connect_timeout = int(c.get("DB_CONNECT_TIMEOUT") or 10)
+    read_timeout = int(c.get("DB_READ_TIMEOUT") or 300)
 
     if driver == "pymysql":
         import pymysql
@@ -145,8 +151,8 @@ def connect(cfg, database=None, conn=None):
             password=password,
             database=dbname,
             charset="utf8mb4",
-            connect_timeout=10,
-            read_timeout=300,
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
         )
 
     if driver == "pymssql":
@@ -158,19 +164,22 @@ def connect(cfg, database=None, conn=None):
             password=password,
             database=dbname or "",
             charset="UTF-8",
-            login_timeout=10,
-            timeout=300,
+            login_timeout=connect_timeout,
+            timeout=read_timeout,
         )
 
     if driver == "psycopg2":
         import psycopg2
+        # psycopg2 没有独立的读超时: 用 libpq options 设 statement_timeout (毫秒),
+        # 让单条查询超 read_timeout 秒后被服务端取消, 等价于 read_timeout.
         conn = psycopg2.connect(
             host=host,
             port=port,
             user=user,
             password=password,
             dbname=dbname or "",
-            connect_timeout=10,
+            connect_timeout=connect_timeout,
+            options=f"-c statement_timeout={read_timeout * 1000}",
         )
         # psycopg2 默认 autocommit=False; SQL 查询场景一般不需要事务,打开 autocommit
         conn.autocommit = True
