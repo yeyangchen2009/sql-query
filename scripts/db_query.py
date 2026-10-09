@@ -204,13 +204,14 @@ def build_sql(args, driver="pymysql"):
     is_pg = driver == "psycopg2"
 
     if args.sql:
-        return args.sql, None
+        # 即使是 --sql 模式,也允许 --database 覆盖连接到的库
+        return args.sql, args.database
 
     if args.file:
         if not os.path.exists(args.file):
             raise FileNotFoundError(f"找不到 SQL 文件: {args.file}")
         with open(args.file, "r", encoding="utf-8") as f:
-            return f.read(), None
+            return f.read(), args.database
 
     if args.list_tables:
         if is_mssql:
